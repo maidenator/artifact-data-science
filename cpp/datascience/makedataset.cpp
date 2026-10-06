@@ -4,7 +4,7 @@
 #include "generator.hpp"
 
 int main(int argc, char** argv) {
-    const int N = argc > 1 ? std::atoi(argv[1]) : 200000;
+    const int N = argc > 1 ? std::atoi(argv[1]) : 1'000'000;
     rng::Xoshiro256 rng(20261006);
     std::ofstream out("artifacts.csv");
     out << "artifact_id,level,slot,main_stat,sub_count,cv,has_crit_rate,has_crit_dmg,final_cv\n";
@@ -16,14 +16,13 @@ int main(int argc, char** argv) {
         std::array<Snap, 6> snaps;
         int n = 0;
 
-        auto take = [&] {
+        auto take = [&] {   
             int cr = 0, cd = 0;
             for (int i = 0; i < art.substatCount; ++i) {
                 cr |= art.subStats[i].type == ArtifactSubstat::critRate;
                 cd |= art.subStats[i].type == ArtifactSubstat::critDmg;
             }
-            snaps[n++] = {art.level, art.substatCount,
-                          generator::calculateCritValue(art), cr, cd};
+            snaps[n++] = {art.level, art.substatCount, generator::calculateCritValue(art), cr, cd};
         };
 
         take();                                   // +0
