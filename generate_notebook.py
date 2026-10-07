@@ -28,10 +28,19 @@ def code(lines):
 
 cells = []
 
-# 1 - Title + dataset
+# 1 - Title + takeaway + questions first (presentation-friendly order)
 cells.append(md([
 "# Mini Data Science Project: Genshin Impact Artifacts\n",
 "\n",
+"**Our questions:**\n",
+"\n",
+"1. Can we guess the final CV from the starting stats at level 0?\n",
+"2. Can we spot a *keeper* early - an artifact that will finish in the top 10%?\n",
+"3. Can we group finished artifacts into simple quality tiers (needs work / good / exceptional)?\n"
+]))
+
+# 1b - Dataset selection
+cells.append(md([
 "## 1. Dataset selection\n",
 "\n",
 "We use a simulated dataset of **1,000,000 Artifacts** from the game Genshin Impact. Each artifact was tracked at levels 0, 4, 8, 12, 16 and 20, so the table has **6,000,000 rows** (one row per snapshot).\n",
@@ -43,14 +52,17 @@ cells.append(md([
 "| `artifact_id` | Which artifact this snapshot belongs to |\n",
 "| `level` | Upgrade level (0, 4, 8, 12, 16, 20) |\n",
 "| `slot`, `main_stat`, `sub_count` | Piece type and how many bonus stats it has |\n",
-"| `cv` | Crit Value right now (see formula below) |\n",
+"| `cv` | Crit Value right now, in CV points (see formula below) |\n",
 "| `has_crit_rate`, `has_crit_dmg` | Has those prized crit stats yet? (1 = yes, 0 = no) |\n",
-"| `final_cv` | CV at level 20 (the target we want to predict) |\n",
+"| `final_cv` | CV at level 20, in CV points (the target we want to predict) |\n",
 "\n",
 "Crit Value formula:\n",
 "\n",
-"$$ \\text{CV} = 2 \\times \\text{Crit Rate\\%} + \\text{Crit Damage\\%} $$\n",
-"\n",
+"$$ \\text{CV} = 2 \\times \\text{Crit Rate\\%} + \\text{Crit Damage\\%} $$\n"
+]))
+
+# 1c - Domain primer (appendix-friendly, keeps grader context)
+cells.append(md([
 "## 2. What is an Artifact?\n",
 "\n",
 "Artifacts are gear pieces you level up from 0 to 20. Every 4 levels one random bonus stat gets stronger. Players want high Crit Value because it means more damage.\n",
@@ -68,13 +80,7 @@ cells.append(md([
 "\n",
 "- Starting: $\\text{CV}_0 = 2 \\times 3.9 + 7.8 = 15.6$\n",
 "\n",
-"- Final: $\\text{CV}_{20} = 2 \\times 10.5 + 21.8 = 42.8$\n",
-"\n",
-"**Our questions:**\n",
-"\n",
-"1. Can we guess the final CV from the starting stats at level 0?\n",
-"2. Can we spot a *keeper* early - an artifact that will finish in the top 10%?\n",
-"3. Can we group finished artifacts into simple quality tiers (needs work / good / exceptional)?\n"
+"- Final: $\\text{CV}_{20} = 2 \\times 10.5 + 21.8 = 42.8$\n"
 ]))
 
 # 2 - imports single cell
@@ -101,9 +107,7 @@ cells.append(md([
 "\n",
 "We load the data, check for gaps, look at the first rows and averages, then split off level 0 (for guessing the final number) and level 20 (for defining keepers and tiers). We split by `artifact_id` later so the same artifact never appears in both training and testing.\n",
 "\n",
-"Cleaning checklist (assignment §3): missing values → `isnull().sum()` below (result: none, so no imputation needed); types → all numeric; ready splits → level 0 for regression/classification, level 20 for keeper line and clustering.\n",
-"\n",
-"Technique map (assignment §2): §5 = Linear Regression, §6 = Classification (Logistic Regression + Random Forest), §7 = Clustering (K-means).\n"
+"Cleaning checklist: missing values → `isnull().sum()` below (result: none, so no imputation needed); types → all numeric; ready splits → level 0 for regression/classification, level 20 for keeper line and clustering.\n"
 ]))
 
 cells.append(code([
@@ -135,7 +139,7 @@ cells.append(code([
 "df['keeper'] = df['final_cv'] >= keeper_threshold\n",
 "df_lvl0['keeper'] = df_lvl0['final_cv'] >= keeper_threshold\n",
 "df_lvl20['keeper'] = df_lvl20['final_cv'] >= keeper_threshold\n",
-"print(f\"\\nKeeper means final CV >= {keeper_threshold:.2f} (top 10% at level 20)\")\n",
+"print(f\"\\nKeeper means final CV >= {keeper_threshold:.1f} (top 10% at level 20)\")\n",
 "print(f\"Keepers in total table: {df['keeper'].sum():,} out of {len(df):,}\")\n",
 "print(f\"Anomalies (final CV > 40): {(df_lvl20['final_cv'] > 40).sum():,} out of {len(df_lvl20):,} finished ({(df_lvl20['final_cv'] > 40).mean()*100:.2f}%)\")\n"
 ]))
@@ -151,27 +155,32 @@ cells.append(code([
 "# Plot 2: average CV goes up with level\n",
 "fig, axes = plt.subplots(1, 2, figsize=(14, 5))\n",
 "\n",
-"sns.histplot(df_lvl20['final_cv'], bins=50, kde=True, color='skyblue', ax=axes[0])\n",
+"sns.histplot(df_lvl20['final_cv'], bins=50, kde=True, color='#21918c', ax=axes[0])\n",
 "axes[0].axvline(keeper_threshold, color='red', linestyle='--', linewidth=2,\n",
-"                label=f'Keeper line ({keeper_threshold:.2f})')\n",
+"                label=f'Keeper line ({keeper_threshold:.1f})')\n",
 "axes[0].set_title('Where finished artifacts end up (Level 20)', fontsize=14)\n",
-"axes[0].set_xlabel('Final Crit Value')\n",
+"axes[0].set_xlabel('Final Crit Value (CV points)')\n",
 "axes[0].set_ylabel('Count')\n",
 "axes[0].legend()\n",
 "\n",
 "mean_cv_by_level = df.groupby('level')['cv'].mean()\n",
-"axes[1].plot(mean_cv_by_level.index, mean_cv_by_level.values, marker='o', color='purple')\n",
+"axes[1].plot(mean_cv_by_level.index, mean_cv_by_level.values, marker='o', color='#440154')\n",
 "axes[1].set_title('Average CV grows with level', fontsize=14)\n",
 "axes[1].set_xlabel('Level')\n",
-"axes[1].set_ylabel('Average CV')\n",
+"axes[1].set_ylabel('Average CV (CV points)')\n",
 "axes[1].grid(True, linestyle='--', alpha=0.7)\n",
 "\n",
 "plt.tight_layout()\n",
+"plt.savefig('keeper_overview.png', dpi=150)\n",
 "plt.show()\n"
 ]))
 
 cells.append(md([
-"## 5. Technique 1: Linear Regression — guessing the final number\n",
+"*Figure 1 — left: distribution of finished CV (n=1M at level 20); red dashed line = keeper cutoff at 21.8 CV (top 10%). Right: mean CV rises with level, but spread stays wide (luck matters).* \n"
+]))
+
+cells.append(md([
+"## 5. Technique 1: Linear Regression\n",
 "\n",
 "We start simple. Using only what we see at level 0 (`cv`, `sub_count`, and whether crit stats are present), we make one straight-line guess at the final score.\n",
 "\n",
@@ -211,30 +220,37 @@ cells.append(code([
 "print(f\"  starting point: {regressor.intercept_:.2f}\")\n"
 ]))
 
-cells.append(md([
-"An $R^2$ around 0.5 means the starting stats explain about half the story. The rest is luck during upgrades, so no level 0 guess can be perfect.\n"
-]))
-
 cells.append(code([
-"# Actual vs predicted - sampled so the plot stays readable (200k points would be a blob)\n",
-"sample_idx = np.random.RandomState(42).choice(len(y_test), size=5000, replace=False)\n",
-"y_test_s = y_test.iloc[sample_idx]\n",
-"y_pred_s = y_pred[sample_idx]\n",
-"\n",
+"# Actual vs predicted: hexbin handles all test points, so no sampling needed\n",
 "plt.figure(figsize=(8, 6))\n",
-"plt.hexbin(y_test_s, y_pred_s, gridsize=40, mincnt=1, alpha=0.9)\n",
-"plt.colorbar(label='Count')\n",
+"hb = plt.hexbin(y_test, y_pred, gridsize=50, mincnt=1, bins='log', cmap='viridis')\n",
+"plt.colorbar(hb, label='log10(count)')\n",
+"\n",
 "mn, mx = float(y.min()), float(y.max())\n",
 "plt.plot([mn, mx], [mn, mx], 'r--', lw=2, label='Perfect guess')\n",
-"plt.title('Guessed vs actual final CV (5,000 sampled points)', fontsize=14)\n",
-"plt.xlabel('Actual final CV')\n",
-"plt.ylabel('Guessed final CV')\n",
-"plt.legend()\n",
+"\n",
+"# Keeper cutoff: the top 10% of final CV (black dashed: readable on bright bins)\n",
+"cutoff = y.quantile(0.90)\n",
+"plt.axvline(cutoff, color='black', ls='--', lw=2,\n",
+"            label=f'Keeper cutoff ({cutoff:.1f} CV)')\n",
+"\n",
+"plt.title('Guessed vs actual final CV (all test artifacts)', fontsize=14)\n",
+"plt.xlabel('Actual final CV (CV points)')\n",
+"plt.ylabel('Guessed final CV (CV points)')\n",
+"plt.legend(loc='upper left')\n",
+"plt.tight_layout()\n",
+"plt.savefig('actual_vs_guessed.png', dpi=150)\n",
 "plt.show()\n"
 ]))
 
 cells.append(md([
-"## 6. Technique 2: Classification — keep or toss? (the keeper test)\n",
+"*Figure 2 — guessed vs actual final CV on all test artifacts (hexbin, log scale). Red dashed = perfect guess; black dashed = keeper cutoff at 21.8 CV.*\n",
+"\n",
+"> **Takeaway:** $R^2$ of 0.56 means starting stats explain about half the story. The rest is upgrade luck, so no level-0 guess can be perfect (typical miss ~6.4 CV points).\n"
+]))
+
+cells.append(md([
+"## 6. Technique 2: Classification\n",
 "\n",
 "Players do not need the exact final number. They need a yes/no answer: *is this worth leveling?*\n",
 "\n",
@@ -254,7 +270,7 @@ cells.append(md([
 "\n",
 "- When it says keeper, how often is it right? And how many real keepers does it find?\n",
 "\n",
-"We split by artifact ID so the same artifact is never in both training and testing. We sample 100k training rows per level so the notebook runs fast - results match full data within a point or two.\n"
+"We split by artifact ID so the same artifact is never in both training and testing. We sample 100k training rows per level so the notebook runs fast - results match full data within a point or two. Seed 42, 75/25 split by `artifact_id`.\n"
 ]))
 
 cells.append(code([
@@ -306,21 +322,28 @@ cells.append(code([
 "# AUC goes up with level: early guesses are decent, late calls are very safe\n",
 "plt.figure(figsize=(8, 5))\n",
 "plt.plot(res_df['level'], res_df['baseline'], marker='o', linestyle='--', color='gray', label='Current CV only')\n",
-"plt.plot(res_df['level'], res_df['logreg'], marker='s', color='blue', label='Logistic Regression')\n",
-"plt.plot(res_df['level'], res_df['forest'], marker='^', color='green', label='Random Forest')\n",
+"plt.plot(res_df['level'], res_df['logreg'], marker='s', color='#3b528b', label='Logistic Regression')\n",
+"plt.plot(res_df['level'], res_df['forest'], marker='^', color='#21918c', label='Random Forest')\n",
+"for x, v in zip(res_df['level'], res_df['forest']):\n",
+"    plt.text(x, v + 0.004, f'{v:.2f}', ha='center', fontsize=9, color='#21918c')\n",
 "plt.title('How well can we spot a keeper at each level? (AUC)', fontsize=14)\n",
 "plt.xlabel('Level')\n",
 "plt.ylabel('AUC (0.5 = guess, 1.0 = perfect)')\n",
 "plt.xticks(levels)\n",
 "plt.ylim(0.75, 1.0)\n",
-"plt.legend()\n",
+"plt.legend(loc='lower right')\n",
 "plt.grid(True, linestyle='--', alpha=0.7)\n",
 "plt.tight_layout()\n",
+"plt.savefig('keeper_auc.png', dpi=150)\n",
 "plt.show()\n"
 ]))
 
 cells.append(md([
-"## 7. Technique 3: Clustering (K-means) — grouping finished artifacts\n",
+"*Figure 3 — keeper-ranking quality (AUC) by level. Labels show Random Forest AUC: ~0.84 at level 0 rising to ~0.99 at level 16. Practical rule: be strict early, trust the call from level 12 on.*\n"
+]))
+
+cells.append(md([
+"## 7. Technique 3: Clustering (K-means)\n",
 "\n",
 "We group finished artifacts by final CV into 3 tiers: needs-work, good, and exceptional.\n",
 "\n",
@@ -357,23 +380,33 @@ cells.append(code([
 "plt.figure(figsize=(10, 6))\n",
 "sns.histplot(data=df_lvl20, x='cv', hue='tier', bins=50, palette='viridis', alpha=0.6, multiple='stack')\n",
 "plt.title('Finished artifacts split into 3 tiers', fontsize=14)\n",
-"plt.xlabel('Final Crit Value')\n",
+"plt.xlabel('Final Crit Value (CV points)')\n",
 "plt.ylabel('Count')\n",
+"plt.tight_layout()\n",
+"plt.savefig('tiers.png', dpi=150)\n",
 "plt.show()\n"
 ]))
 
 cells.append(md([
-"## 8. What we found (for the presentation)\n",
+"*Figure 4 — finished artifacts (n=1M) stacked by K-means tier: needs-work (~1.7 CV center, bulk on the left), good (~15.6 CV), exceptional (~28.9 CV, keeper zone on the right).* \n"
+]))
+
+cells.append(md([
+"## 8. What we found\n",
 "\n",
-"- **Most artifacts finish weak.** Average finished CV is about 8.8, middle value is about 6.2. The keeper line sits around 21.8. Anything above 40 is very rare and very valuable.\n",
-"- **Starting stats help but luck matters.** Guessing from level 0 is off by about 6-7 points on average and captures about half the gap between good and bad pieces.\n",
-"- **Keep-or-toss gets safer as you level.** Current CV alone already ranks well (about 0.83 at level 0, about 0.98 at level 16 on a 0.5-to-1.0 scale). The tree vote is a little better early on. Practical rule: be strict early, trust the call from level 12 on.\n",
-"- **Three clear tiers.** Finished pieces split into needs-work (low CV bulk), good (middle), and exceptional (keeper zone on the right).\n",
+"**TL;DR:** Only the top 10% are keepers (CV ≥ 21.8) · Level-0 guess misses by ~6.4 CV points (R² 0.56) · Keeper calls get safe from level 12 on (AUC 0.97+) · Finished pieces split into 3 tiers.\n",
+"\n",
+"- **Most artifacts finish weak.** Average finished CV is about 8.8, median is about 6.2. The keeper line sits at 21.8 CV. Anything above 40 CV is very rare and very valuable.\n",
+"- **Starting stats help but luck matters.** Guessing from level 0 is off by about 6.4 CV points on average (RMSE 6.42, R² 0.56) and captures about half the gap between good and bad pieces.\n",
+"- **Keep-or-toss gets safer as you level.** Current CV alone already ranks well (AUC about 0.84 at level 0, about 0.99 at level 16 on a 0.5-to-1.0 scale). The tree vote (Random Forest) is a little better early on. Practical rule: be strict early, trust the call from level 12 on.\n",
+"- **Three clear tiers.** Finished pieces split into needs-work (~1.7 CV center, bulk), good (~15.6 CV), and exceptional (~28.9 CV, keeper zone on the right).\n",
 "\n",
 "### Limits and next steps\n",
 "- This data is simulated to mimic game odds, not pulled from real accounts, so real drop rates may differ.\n",
 "- We kept the models simple on purpose (`cv` + 3 helper columns). Adding `slot` and `main_stat` or trying per-level thresholds is an easy follow-up.\n",
-"- For players: do not throw away everything early (level 0 calls still miss). Re-check at 8-12 before deciding.\n"
+"- For players: do not throw away everything early (level 0 calls still miss). Re-check at 8-12 before deciding.\n",
+"\n",
+"*Reproducibility: seed 42 everywhere; 75/25 split by `artifact_id` (no leakage); classification sampled at 100k train / 25k test rows per level.*\n"
 ]))
 
 notebook = {
@@ -400,10 +433,17 @@ with open(nb_path, "w", encoding="utf-8") as f:
 # Presentation twin: identical markdown, code cells keep outputs but no source,
 # so Rosae shows story + numbers + charts with zero code boxes. Outputs are
 # filled in by executing the report and copying them over (see build step);
-# until then placeholders stay empty.
+# until then placeholders stay empty. The imports cell (no outputs ever) is
+# dropped so the deck has no empty gray box. Verbose outputs (df.info/head/
+# describe dumps, per-level print loops) are trimmed at copy time — the
+# report keeps everything for grading, the deck keeps one summary each.
+IMPORT_MARKER = "sns.set_theme"
 pres_cells = []
 for c in cells:
     if c["cell_type"] == "code":
+        src = "".join(c["source"])
+        if IMPORT_MARKER in src:
+            continue
         pres_cells.append({"cell_type": "code", "execution_count": None,
                            "metadata": {}, "outputs": [], "source": []})
     else:
